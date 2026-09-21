@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>bmi-web</artifactId>
+    <version>1.0.0</version>
+    <packaging>war</packaging>
+
+    <name>bmi-web</name>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.release>17</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <!-- Tomcat 9 自带 servlet-api，scope 必须为 provided，避免打进 WEB-INF/lib 与容器冲突 -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <!--
+            finalName 决定部署目录 target/{finalName}。
+            Local Tomcat Launcher 通过 mvn help:evaluate -Dexpression=project.build.finalName 读取它，
+            并把 conf/Catalina/localhost/{contextPath}.xml 的 docBase 指到该目录。
+        -->
+        <finalName>bmi-web</finalName>
+
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-war-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <!-- 本工程没有 src/main/webapp/WEB-INF/web.xml，需关闭该项校验 -->
+                    <failOnMissingWebXml>false</failOnMissingWebXml>
+                </configuration>
+            </plugin>
+
+            <!--
+                兼容 Local Tomcat Launcher 的 finalName 解析缺陷：
+                该插件用 `mvn help:evaluate -Dexpression=project.build.finalName` 取 finalName，
+                调用点在构造函数里且没有 await / catch —— 一旦扩展宿主进程的 PATH 里找不到 mvn，
+                finalName 会永久停在空串，docBase 被写成 <工作区>\target（而不是 <工作区>\target\bmi-web）。
+                这里在 package 阶段把解压后的 webapp 再镜像一份到 target\ 根目录，
+                使 docBase 取到 target\bmi-web 或 target\ 都能正常访问。
+                若插件行为恢复正常、想移除这段兜底，删掉下面整个 plugin 节点即可。
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <version>3.3.1</version>
+                <executions>
+                    <execution>
+                        <id>mirror-exploded-webapp-into-target-root</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.build.directory}/${project.build.finalName}</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
